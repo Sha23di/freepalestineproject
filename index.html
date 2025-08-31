@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FreePalestine.click</title>
+  <meta name="description" content="Click the Palestinian flag button to show support. 🇵🇸" />
+  <style>
+    :root {
+      --bg: #f5f3ec;          /* milk-like background */
+      --text: #2b2b2b;
+      --shadow: rgba(0,0,0,0.18);.
+      --emoji-size: 54px;
+      --top-safe: 110px;      /* keep emojis from hiding behind header */
+    }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+      display: grid;
+      place-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Header with counters */
+    .header {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      z-index: 20;
+      user-select: none;
+    }
+
+    .counters {
+      display: inline-flex;
+      gap: 22px;
+      padding: 10px 14px;
+      background: rgba(255,255,255,0.65);
+      backdrop-filter: blur(6px);
+      border-radius: 12px;
+      box-shadow: 0 6px 22px var(--shadow);
+      border: 1px solid rgba(0,0,0,0.06);
+      font-weight: 600;
+    }
+
+    .counter-label {
+      opacity: 0.8;
+      font-weight: 500;
+      margin-right: 6px;
+    }
+
+    .site-name {
+      margin-top: 10px;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    /* Center flag button */
+    .flag-button {
+      width: 170px;
+      height: 170px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 14px 36px var(--shadow);
+      transition: transform 120ms ease, filter 120ms ease;
+      background: #fff;
+      z-index: 10;
+      touch-action: manipulation;
+    }
+    .flag-button:hover { transform: scale(1.04); }
+    .flag-button:active { transform: scale(0.96); }
+
+    /* Palestinian flag inside the circle */
+    .flag {
+      position: absolute;
+      inset: 0;
+    }
+    .stripe { width: 100%; height: 33.333%; }
+    .black { background: #000; }
+    .white { background: #fff; }
+    .green { background: #007a3d; }
+    .triangle {
+      position: absolute;
+      left: 0; top: 50%;
+      transform: translateY(-50%);
+      width: 0; height: 0;
+      border-style: solid;
+      border-width: 85px 0 85px 90px;
+      border-color: transparent transparent transparent #ce1126;
+    }
+
+    /* 🇵🇸 emoji that pops and jiggles */
+    .emoji {
+      position: absolute;
+      font-size: var(--emoji-size);
+      line-height: 1;
+      pointer-events: none;
+      filter: drop-shadow(0 6px 12px var(--shadow));
+      animation: pop-jiggle 1600ms ease-in-out forwards;
+      z-index: 5;
+    }
+
+    @keyframes pop-jiggle {
+      0%   { opacity: 0; transform: scale(0) rotate(0deg); }
+      12%  { opacity: 1; transform: scale(1.15) rotate(8deg); }
+      26%  { transform: scale(0.96) rotate(-8deg); }
+      40%  { transform: scale(1.06) rotate(5deg); }
+      60%  { transform: scale(1.00) rotate(-4deg); }
+      80%  { transform: scale(1.02) rotate(2deg); }
+      100% { opacity: 1; transform: scale(1) rotate(0deg); }
+    }
+
+    /* Respect reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      .emoji { animation: none; }
+      .flag-button { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header" aria-live="polite">
+    <div class="counters">
+      <div><span class="counter-label">Your clicks:</span><span id="localCount">0</span></div>
+      <div><span class="counter-label">Global clicks:</span><span id="globalCount">0</span></div>
+    </div>
+    <div class="site-name">FreePalestine.click</div>
+  </header>
+
+  <button id="flagButton" class="flag-button" aria-label="Click to say Free Palestine">
+    <div class="flag" aria-hidden="true">
+      <div class="stripe black"></div>
+      <div class="stripe white"></div>
+      <div class="stripe green"></div>
+      <div class="triangle"></div>
+    </div>
+  </button>
+
+  <!-- App logic + Firebase (for global counter) -->
+  <script type="module">
+    // 1) UI + local counter + emoji spawner + speech
+    const btn = document.getElementById('flagButton');
+    const localCountEl = document.getElementById('localCount');
+    const globalCountEl = document.getElementById('globalCount');
+
+    // Restore local count
+    let localCount = Number(localStorage.getItem('localClicks') || 0);
+    localCountEl.textContent = localCount.toLocaleString();
+
+    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+
+    function spawnEmoji() {
+      const e = document.createElement('div');
+      e.className = 'emoji';
+      e.textContent = '🇵🇸';
+
+      const size = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--emoji-size')) || 54;
+      const padding = 12;
+      const topSafe = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--top-safe')) || 100;
+
+      const maxX = window.innerWidth - size - padding;
+      const maxY = window.innerHeight - size - padding;
+      const x = clamp(Math.random() * (maxX - padding) + padding, padding, maxX);
+      const y = clamp(Math.random() * (maxY - topSafe) + topSafe, topSafe, maxY);
+
+      e.style.left = x + 'px';
+      e.style.top  = y + 'px';
+
+      // Clean up after animation
+      e.addEventListener('animationend', () => e.remove());
+      document.body.appendChild(e);
+    }
+
+    function sayFreePalestine() {
+      // Use Web Speech API to speak the phrase
+      try {
+        if ('speechSynthesis' in window) {
+          const u = new SpeechSynthesisUtterance('Free Palestine');
+          u.lang = 'en-US';
+          u.rate = 1;
+          u.pitch = 1;
+          window.speechSynthesis.cancel(); // avoid queue buildup
+          window.speechSynthesis.speak(u);
+        } else {
+          // Quick fallback beep if speech is unavailable
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = 'sine'; o.frequency.value = 660;
+          g.gain.setValueAtTime(0.001, ctx.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.01);
+          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+          o.connect(g).connect(ctx.destination);
+          o.start(); o.stop(ctx.currentTime + 0.22);
+        }
+      } catch (e) {
+        console.warn('Audio unavailable:', e);
+      }
+    }
+
+    // Click handler
+    async function onClick() {
+      // Local count
+      localCount += 1;
+      localStorage.setItem('localClicks', String(localCount));
+      localCountEl.textContent = localCount.toLocaleString();
+
+      // Emoji + sound
+      spawnEmoji();
+      sayFreePalestine();
+
+      // Global count via Firebase (below)
+      try { await incrementGlobal(); } catch (e) { console.error(e); }
+    }
+
+    btn.addEventListener('click', onClick);
+
+    // 2) Firebase Realtime Database for global counter
+
+    // Import Firebase modules
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import {
+      getDatabase, ref, onValue, runTransaction
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
+    // Replace these with your Firebase project's config (see setup steps below)
+    const firebaseConfig = {
+      apiKey: "AIzaSyAYWYmTk2KmrAAWfl3ovjuDLMPJhL935qs",
+      authDomain: "freepalclick.firebaseapp.com",
+      databaseURL: "https://freepalclick-default-rtdb.firebaseio.com",
+      projectId: "freepalclick",
+      storageBucket: "freepalclick.firebasestorage.app",
+      messagingSenderId: "953016605751",
+      appId: "1:953016605751:web:0b542014ed597a0e65f3b2",
+      measurementId: "G-9KL51BRNTP"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const globalRef = ref(db, "globalClicks");
+
+    // Live updates to the global counter
+    onValue(globalRef, (snap) => {
+      const val = snap.exists() ? Number(snap.val()) : 0;
+      globalCountEl.textContent = val.toLocaleString();
+    }, (err) => console.error('onValue error:', err));
+
+    // Atomic increment for the global counter
+    async function incrementGlobal() {
+      await runTransaction(globalRef, (current) => (current || 0) + 1);
+    }
+
+    // Optional: initialize the counter if missing (first load)
+    runTransaction(globalRef, (current) => (current == null ? 0 : current)).catch(()=>{});
+  </script>
+<!-- Removed duplicate Firebase initialization to fix redeclaration error -->
+</body>
+</html>
